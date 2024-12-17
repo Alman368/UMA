@@ -55,6 +55,17 @@ void handler_chld(int s){
 	}
 }
 
+void handler_hup(int s){
+	FILE *fp;
+    fp=fopen("hup.txt","a"); // abre un fichero en modo 'append'
+	if (fp == NULL){
+		perror("Ha habido un error al intentar abrir el fichero con fopen");
+		exit(1);
+	}
+    fprintf(fp, "SIGHUP recibido.\n"); //escribe en el fichero
+	fclose(fp);
+}
+
 // -----------------------------------------------------------------------
 //                            MAIN
 // -----------------------------------------------------------------------
@@ -72,6 +83,7 @@ int main(void)
 	lista_jobs = new_list("lista_jobs");
 
 	signal(SIGCHLD, handler_chld); // Se trata y maneja la señal SIGCHLD
+	signal(SIGHUP, handler_hup);
 	ignore_terminal_signals(); //ignoramos todas las señales del terminal como ctrl + C, por ejemplo.
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{
@@ -193,6 +205,15 @@ int main(void)
 			continue;
 		}
 
+		if(strcmp(args[0], "currjob") == 0){
+			job *trabajo = get_item_bypos(lista_jobs, 1);
+			if (trabajo == NULL){
+				printf("No hay trabajo actual");
+				continue;
+			}
+			printf("Trabajo actual: PID=%d command=%s", trabajo->pgid, trabajo->command);
+			continue;
+		}
 		/* the steps are:
 			 (1) fork a child process using fork()
 			 (2) the child process will invoke execvp()
