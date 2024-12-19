@@ -55,17 +55,6 @@ void handler_chld(int s){
 	}
 }
 
-void handler_hup(int s){
-	FILE *fp;
-    fp=fopen("hup.txt","a"); // abre un fichero en modo 'append'
-	if (fp == NULL){
-		perror("Ha habido un error al intentar abrir el fichero con fopen");
-		exit(1);
-	}
-    fprintf(fp, "SIGHUP recibido.\n"); //escribe en el fichero
-	fclose(fp);
-}
-
 // -----------------------------------------------------------------------
 //                            MAIN
 // -----------------------------------------------------------------------
@@ -83,7 +72,6 @@ int main(void)
 	lista_jobs = new_list("lista_jobs");
 
 	signal(SIGCHLD, handler_chld); // Se trata y maneja la señal SIGCHLD
-	signal(SIGHUP, handler_hup);
 	ignore_terminal_signals(); //ignoramos todas las señales del terminal como ctrl + C, por ejemplo.
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{
@@ -202,59 +190,6 @@ int main(void)
 				perror("Se ha pasado un argumento que es incorrecto");
 			}
 			mask_signal (SIGCHLD, SIG_UNBLOCK);
-			continue;
-		}
-
-		if(strcmp(args[0], "currjob") == 0){
-			job *trabajo = get_item_bypos(lista_jobs, 1);
-			if (trabajo == NULL){
-				printf("No hay trabajo actual");
-				continue;
-			}
-			printf("Trabajo actual: PID=%d command=%s", trabajo->pgid, trabajo->command);
-			continue;
-		}
-		if(strcmp(args[0], "bgteam") == 0){
-			int n_bgteam;
-			job* trabajo_bgteam;
-			if(args[1] == NULL || args[2] == NULL){
-				printf("El comando bgteam requiere dos argumentos");
-				continue;
-			} else {
-				n_bgteam = atoi(args[1]);
-			}
-			if (n_bgteam <= 0){
-				continue;
-			}
-
-			for(int i = 0;i < n_bgteam;++i){
-				pid_fork = fork();
-				if (pid_fork == 0) {//child
-					restore_terminal_signals();
-					if(setpgid(0,0) != 0){//El 0 del primer parámetro hace que la función afecte al proceso que la ejecuta, el segundo 0 dice que uses el pgid que hayas puesto como primer parámetro
-						perror("Ha habido un error al establecer el grupo (setpgid)");
-						exit(EXIT_FAILURE);
-					}
-					execvp(args[2], &args[2]);
-					fprintf(stderr, "Error, command not found %s\n", args[0]);
-					exit(EXIT_FAILURE);
-				} else if (pid_fork > 0) {//proceso padre
-					ignore_terminal_signals();
-					if((tcsetpgrp(STDIN_FILENO, pid_fork)) == -1){
-						perror("Error al dar la terminal al hijo desde el padre");
-						continue;
-					}
-					pid_wait = waitpid(pid_fork, &status, WUNTRACED);
-					if (pid_wait == -1){
-						perror("Fallo en el wait");
-						continue;
-					}
-					mask_signal(SIGCHLD, SIG_BLOCK);
-					trabajo_bgteam = new_job(getpid(), "bgteam", BACKGROUND);
-					add_job(lista_jobs, trabajo_bgteam);
-					mask_signal(SIGCHLD, SIG_UNBLOCK);
-				}
-			}
 			continue;
 		}
 
